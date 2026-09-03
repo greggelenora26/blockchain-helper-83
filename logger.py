@@ -1,36 +1,39 @@
 import logging
+import os
 from logging.handlers import RotatingFileHandler
-import json
 from datetime import datetime
 
-class CryptoJsonFormatter(logging.Formatter):
-    def format(self, record):
-        log_entry = {
-            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-            "level": record.levelname,
-            "message": record.getMessage(),
-            "module": record.module
-        }
-        if hasattr(record, "tx_hash"):
-            log_entry["tx_hash"] = getattr(record, "tx_hash")
-        return json.dumps(log_entry)
+class BlockchainFormatter(logging.Formatter):
+    """Colorful and concise logs for chain telemetry"""
+    COLORS = {'DEBUG': '\033[94m', 'INFO': '\033[92m', 'WARNING': '\033[93m', 'ERROR': '\033[91m'}
 
-def setup_blockchain_logger(name="blockchain_helper", log_file="app.log"):
+    def format(self, record):
+        color = self.COLORS.get(record.levelname, '')
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return f"{color}[{timestamp}] {record.levelname} | {record.getMessage()}\033[0m"
+
+def get_chain_logger(name='blockchain-helper-83'):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
-    if not logger.handlers:
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=1048576, backupCount=5, encoding="utf-8"
-        )
-        file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(CryptoJsonFormatter())
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        console_formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(message)s",
-            datefmt="%H:%M:%S"
-        )
-        console_handler.setFormatter(console_formatter)
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
+
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+
+    handler = RotatingFileHandler(
+        filename=f'logs/{name}.log',
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5
+    )
+
+    console_handler = logging.StreamHandler()
+    
+    formatter = BlockchainFormatter()
+    handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+    logger.addHandler(console_handler)
+    
     return logger
+
+log = get_chain_logger()
