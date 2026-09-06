@@ -1,35 +1,41 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
-from datetime import datetime
+from pathlib import Path
 
-class BlockchainLogger:
-    """Colorful ephemeral logging for blockchain-helper-83 operations."""
-    _instance = None
+def setup_crypto_logger(log_file: str = "blockchain.log", max_bytes: int = 5_000_000, backup_count: int = 3) -> logging.Logger:
+    """Sets up a specialized logger with rotation for blockchain event tracking."""
+    logger = logging.getLogger("blockchain_helper")
+    logger.setLevel(logging.DEBUG)
+    
+    if logger.handlers:
+        return logger
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(BlockchainLogger, cls).__new__(cls)
-            cls._instance._setup_logger()
-        return cls._instance
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] [NODE-SYNC] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
-    def _setup_logger(self):
-        self.logger = logging.getLogger('crypto_dev')
-        self.logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            '[%(asctime)s] [CHAIN_NODE] %(levelname)s: %(message)s',
-            datefmt='%H:%M:%S'
-        )
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-    def log_tx(self, tx_hash: str, status: str):
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        msg = f"TX_AUDIT | {tx_hash[:8]}... | STATUS: {status.upper()} | TS: {timestamp}"
-        self.logger.info(msg)
+    log_path = Path("logs")
+    log_path.mkdir(exist_ok=True)
+    file_handler = RotatingFileHandler(
+        log_path / log_file,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8"
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
-    def error_warp(self, context: str, err: Exception):
-        self.logger.critical(f"CRITICAL_FAILURE in {context}: {str(err)}")
+    return logger
 
-def get_logger():
-    return BlockchainLogger().logger
+if __name__ == "__main__":
+    log = setup_crypto_logger()
+    log.info("node synchronization sequence initialized")
+    log.debug("tracing genesis block verification params")
