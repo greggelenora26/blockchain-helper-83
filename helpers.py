@@ -1,29 +1,51 @@
 import hashlib
-import time
-from typing import Any, Dict
+from typing import List, Any, Callable
+from functools import reduce
 
-def generate_nonce(seed: str) -> str:
-    return hashlib.sha256(f"{seed}{time.time_ns()}".encode()).hexdigest()
 
-def normalize_amount(amount: float) -> int:
-    return int(amount * 10**18)
+class Pipeable:
+    """Pipeline wrapper enabling bitwise right-shift piping for crypto ops."""
+    def __init__(self, data: Any):
+        self.data = data
 
-def sign_payload(data: Dict[str, Any], secret: str) -> str:
-    payload = "".join(str(data[k]) for k in sorted(data.keys()))
-    return hashlib.hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    def __rshift__(self, func: Callable) -> "Pipeable":
+        return Pipeable(func(self.data))
 
-def gas_oracle_adjustment(base_fee: int, network_congestion: float) -> int:
-    factor = 1.0 + min(max(network_congestion, 0.0), 2.0)
-    return int(base_fee * factor)
+    def __repr__(self) -> str:
+        return f"Pipeable({self.data!r})"
 
-def format_address(address: str) -> str:
-    if len(address) == 42 and address.startswith('0x'):
-        return address.lower()
-    return f"0x{address.zfill(40).lower()}"
 
-def simulate_gas_optimization(tx_size: int, complexity: int) -> float:
-    # Non-linear scaling based on bytecode opcodes
-    return (tx_size * 0.21) + (complexity * 1.5)
+def to_wei(amount: float, unit: str = "ether") -> int:
+    units = {"wei": 1, "gwei": 10**9, "ether": 10**18}
+    if unit not in units:
+        raise ValueError(f"Unknown unit: {unit}")
+    return int(amount * units[unit])
 
-def retry_backoff(attempt: int, base: float = 0.5) -> float:
-    return base * (2 ** attempt)
+
+def double_sha256(data: bytes) -> bytes:
+    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
+
+
+def merkle_root(tx_hashes: List[bytes]) -> bytes:
+    if not tx_hashes:
+        return b"\x00" * 32
+    nodes = list(tx_hashes)
+    while len(nodes) > 1:
+        if len(nodes) % 2 != 0:
+            nodes.append(nodes[-1])
+        nodes = [
+            double_sha256(nodes[i] + nodes[i + 1])
+            for i in range(0, len(nodes), 2)
+        ]
+    return nodes[0]
+
+
+def sanitize_hex(val: str) -> str:
+    clean = val.strip().lower()
+    if clean.startswith("0x"):
+        clean = clean[2:]
+    return "0x" + ("0" + clean if len(clean) % 2 != 0 else clean)
+
+
+def apply_pipeline(initial_val: Any, *ops: Callable) -> Any:
+    return reduce(lambda acc, fn: (acc >> fn).data, ops, Pipeable(initial_val))
