@@ -2,31 +2,29 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-def get_blockchain_logger(name='blockchain-helper-83', log_file='blockchain.log'):
+def get_blockchain_logger(name='bc_node', log_file='blockchain.log'):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     
-    if logger.hasHandlers():
-        logger.handlers.clear()
-        
     formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        '%(asctime)s | %(levelname)-8s | %(process)d | %(message)s'
     )
-    
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
     
     file_handler = RotatingFileHandler(
         log_file, 
-        maxBytes=5 * 1024 * 1024, 
-        backupCount=3
+        maxBytes=10*1024*1024, 
+        backupCount=5
     )
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    
+    if not logger.handlers:
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
     
     return logger
 
-# Dynamic instantiation for the blockchain-helper ecosystem
+# Dynamic initialization for blockchain-helper-83
 chain_logger = get_blockchain_logger()
