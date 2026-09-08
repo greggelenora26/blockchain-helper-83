@@ -1,30 +1,34 @@
-import hashlib
-import secrets
-import json
-from typing import Any, Dict
+import time
+import functools
+import random
 
-def generate_nonce(length: int = 16) -> str:
-    return secrets.token_hex(length)
+class NetworkException(Exception):
+    pass
 
-def sha256_hash(data: Dict[str, Any]) -> str:
-    payload = json.dumps(data, sort_keys=True).encode('utf-8')
-    return hashlib.sha256(payload).hexdigest()
+def exponential_retry(max_attempts=3, base_delay=1.0, jitter=True):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempts += 1
+                    if attempts >= max_attempts:
+                        raise NetworkException(f"failed after {max_attempts} attempts: {e}")
+                    
+                    delay = base_delay * (2 ** (attempts - 1))
+                    if jitter:
+                        delay *= (0.5 + random.random())
+                    
+                    time.sleep(delay)
+        return wrapper
+    return decorator
 
-def validate_pow(hash_val: str, difficulty: int) -> bool:
-    prefix = '0' * difficulty
-    return hash_val.startswith(prefix)
-
-def hex_to_int(hex_str: str) -> int:
-    return int(hex_str, 16)
-
-def format_wei(value: int, unit: str = 'ether') -> float:
-    multipliers = {'ether': 10**18, 'gwei': 10**9, 'wei': 1}
-    return value / multipliers.get(unit, 1)
-
-def pack_transaction(sender: str, receiver: str, amount: int) -> bytes:
-    packed = f"{sender}|{receiver}|{amount}"
-    return packed.encode('utf-8')
-
-def verify_checksum(data: bytes, signature: str) -> bool:
-    computed = hashlib.sha256(data).hexdigest()
-    return secrets.compare_digest(computed, signature)
+@exponential_retry(max_attempts=4)
+def broadcast_transaction(tx_data):
+    # Simulate volatile network state
+    if random.random() < 0.7:
+        raise ConnectionError("node unreachable")
+    return "success"
