@@ -1,51 +1,39 @@
 import hashlib
-from typing import List, Any, Callable
-from functools import reduce
+import json
+from typing import Union, Callable, Any
 
+class CryptoMath(type):
+    """Metaclass enabling dynamic crypto denomination conversions via attributes."""
+    UNITS = {"wei": 0, "gwei": 9, "ether": 18, "satoshi": 0, "btc": 8}
+    
+    def __getattr__(cls, name: str) -> Callable[[Union[int, float]], float]:
+        if "_to_" in name:
+            parts = name.split("_to_")
+            if len(parts) == 2 and parts[0] in cls.UNITS and parts[1] in cls.UNITS:
+                src_pow = cls.UNITS[parts[0]]
+                dst_pow = cls.UNITS[parts[1]]
+                return lambda val: float(val) * (10 ** (src_pow - dst_pow))
+        raise AttributeError(f"Invalid conversion method: {name}")
 
-class Pipeable:
-    """Pipeline wrapper enabling bitwise right-shift piping for crypto ops."""
-    def __init__(self, data: Any):
-        self.data = data
+class Convert(metaclass=CryptoMath):
+    pass
 
-    def __rshift__(self, func: Callable) -> "Pipeable":
-        return Pipeable(func(self.data))
+def generate_address_checksum(payload: bytes) -> str:
+    """Generate double-SHA256 checksum hex string for transaction payloads."""
+    first_pass = hashlib.sha256(payload).digest()
+    second_pass = hashlib.sha256(first_pass).digest()
+    return payload.hex() + second_pass[:4].hex()
 
-    def __repr__(self) -> str:
-        return f"Pipeable({self.data!r})"
+def pack_payload(**kwargs: Any) -> bytes:
+    """Serialize parameters into a deterministic binary digest."""
+    sorted_data = json.dumps(kwargs, sort_keys=True, separators=(',', ':'))
+    return hashlib.blake2b(sorted_data.encode('utf-8'), digest_size=16).digest()
 
-
-def to_wei(amount: float, unit: str = "ether") -> int:
-    units = {"wei": 1, "gwei": 10**9, "ether": 10**18}
-    if unit not in units:
-        raise ValueError(f"Unknown unit: {unit}")
-    return int(amount * units[unit])
-
-
-def double_sha256(data: bytes) -> bytes:
-    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
-
-
-def merkle_root(tx_hashes: List[bytes]) -> bytes:
-    if not tx_hashes:
-        return b"\x00" * 32
-    nodes = list(tx_hashes)
-    while len(nodes) > 1:
-        if len(nodes) % 2 != 0:
-            nodes.append(nodes[-1])
-        nodes = [
-            double_sha256(nodes[i] + nodes[i + 1])
-            for i in range(0, len(nodes), 2)
-        ]
-    return nodes[0]
-
-
-def sanitize_hex(val: str) -> str:
-    clean = val.strip().lower()
-    if clean.startswith("0x"):
-        clean = clean[2:]
-    return "0x" + ("0" + clean if len(clean) % 2 != 0 else clean)
-
-
-def apply_pipeline(initial_val: Any, *ops: Callable) -> Any:
-    return reduce(lambda acc, fn: (acc >> fn).data, ops, Pipeable(initial_val))
+def vanity_score(address: str) -> float:
+    """Calculate rarity score based on repeating prefix sequences."""
+    clean_addr = address.lower().replace("0x", "")
+    if not clean_addr:
+        return 0.0
+    first_char = clean_addr[0]
+    prefix_len = len(clean_addr) - len(clean_addr.lstrip(first_char))
+    return round((16 ** prefix_len) / 100.0, 2)
