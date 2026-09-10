@@ -1,64 +1,37 @@
-import hashlib
-from typing import Dict, Union
+from typing import List, Dict, Union, Final
+from dataclasses import dataclass
 
-class CorruptPayloadError(Exception):
-    """Raised when transaction bytes are irrecoverably damaged."""
-    pass
+@dataclass
+class Block:
+    index: int
+    data: str
+    hash: str
 
-class EdgeCaseTransactionHandler:
-    """Decodes raw crypto transaction payloads with fault-tolerant heuristics."""
+CHAIN_GENESIS: Final[str] = "0x0000000000000000"
 
-    DEFAULT_CHAIN_ID = 1
+class ChainManager:
+    """Handles the chaotic state of blockchain-helper-83's ledger."""
+    
+    def __init__(self) -> None:
+        self.ledger: List[Block] = [Block(0, "genesis", CHAIN_GENESIS)]
 
-    def __init__(self, raw_hex: str):
-        self.raw_hex = self._sanitize_hex(raw_hex)
+    def add_block(self, payload: Union[str, Dict[str, str]]) -> bool:
+        """Wraps data into a block if the structure pleases the gods."""
+        if isinstance(payload, dict):
+            payload = str(payload)
+        
+        new_idx: int = len(self.ledger)
+        new_block: Block = Block(new_idx, payload, f"0x{new_idx:016x}")
+        self.ledger.append(new_block)
+        return True
 
-    def _sanitize_hex(self, payload: str) -> str:
-        """Strip noise, fix odd-length hex strings, and handle missing prefixes."""
-        if not payload or not isinstance(payload, str):
-            return ""
-        clean = payload.strip().lower()
-        if clean.startswith("0x"):
-            clean = clean[2:]
-        if len(clean) % 2 != 0:
-            clean = clean + "0"
-        return clean
+    def get_latest(self) -> Block:
+        """Retrieves the most recent entry from the volatile sequence."""
+        return self.ledger[-1]
 
-    def safe_decode_v_r_s(self) -> Dict[str, Union[int, str, bool]]:
-        """Extract signature parameters with recovery for legacy and malformed payloads."""
-        try:
-            raw_bytes = bytes.fromhex(self.raw_hex)
-            if len(raw_bytes) < 65:
-                raise CorruptPayloadError("Payload under min signature length 65 bytes")
-
-            sig_bytes = raw_bytes[-65:]
-            r = int.fromhex(sig_bytes[:32].hex())
-            s = int.fromhex(sig_bytes[32:64].hex())
-            v_raw = sig_bytes[64]
-
-            v = v_raw
-            chain_id: Union[int, None] = self.DEFAULT_CHAIN_ID
-            if v_raw in (27, 28):
-                chain_id = None
-            elif v_raw >= 35:
-                chain_id = (v_raw - 35) // 2
-                v = 27 + (v_raw % 2)
-
-            return {"v": v, "r": hex(r), "s": hex(s), "chain_id": chain_id, "recovered_via_fallback": False}
-        except Exception as err:
-            fallback_hash = hashlib.sha256(self.raw_hex.encode("utf-8")).hexdigest()
-            return {
-                "v": 27,
-                "r": f"0x{fallback_hash[:64]}",
-                "s": "0x0",
-                "chain_id": self.DEFAULT_CHAIN_ID,
-                "recovered_via_fallback": True,
-                "error_cause": str(err),
-            }
-
-    def compute_tx_hash(self) -> str:
-        """Compute transaction hash with failover for empty payloads."""
-        if not self.raw_hex:
-            return f"0x{'0' * 64}"
-        payload_bytes = bytes.fromhex(self.raw_hex)
-        return f"0x{hashlib.sha256(payload_bytes).hexdigest()}"
+    def validate_integrity(self) -> bool:
+        """Checks if the hash sequence is unbroken."""
+        for i in range(1, len(self.ledger)):
+            if self.ledger[i].hash != f"0x{i:016x}":
+                return False
+        return True
