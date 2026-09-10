@@ -1,36 +1,31 @@
-import time
-import functools
-import random
-from typing import Callable, Any
+import hashlib
+import json
+import secrets
 
-def retry_with_exponential_backoff(max_attempts: int = 5, base_delay: float = 1.0):
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            attempt = 0
-            while attempt < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempt += 1
-                    if attempt == max_attempts:
-                        raise e
-                    sleep_time = (base_delay * (2 ** attempt)) + (random.random() * 0.1)
-                    time.sleep(sleep_time)
-        return wrapper
-    return decorator
+def generate_entropy(length: int = 32) -> str:
+    return secrets.token_hex(length)
 
-class NetworkProcessor:
-    @retry_with_exponential_backoff(max_attempts=3, base_delay=0.5)
-    def fetch_node_status(self, endpoint: str):
-        # Simulate unstable crypto node connection
-        if random.random() < 0.7:
-            raise ConnectionError(f"Node {endpoint} unreachable")
-        return {"status": "synced", "block": 1234567}
+def hash_payload(data: dict) -> str:
+    serialized = json.dumps(data, sort_keys=True).encode('utf-8')
+    return hashlib.sha256(serialized).hexdigest()
 
-if __name__ == '__main__':
-    processor = NetworkProcessor()
+def batch_process_txs(tx_list: list, salt: str) -> list:
+    processed = []
+    for tx in tx_list:
+        tx['nonce'] = hash_payload({'tx': tx, 'salt': salt})[:8]
+        processed.append(tx)
+    return processed
+
+def derive_shard_id(address: str, total_shards: int) -> int:
+    hash_val = int(hashlib.md5(address.encode()).hexdigest(), 16)
+    return hash_val % total_shards
+
+def sanitize_float(val: any) -> float:
     try:
-        print(processor.fetch_node_status("mainnet.infura.io"))
-    except Exception as err:
-        print(f"Final failure after retries: {err}")
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
+
+def sign_payload_mock(data: dict) -> dict:
+    data['_metadata'] = {'signature': generate_entropy(16)}
+    return data
