@@ -1,31 +1,42 @@
-import hashlib
-import json
-import secrets
+import re
+from typing import Dict, Any, Generator, Callable, List
 
-def generate_entropy(length: int = 32) -> str:
-    return secrets.token_hex(length)
+class InvalidTransactionError(ValueError):
+    pass
 
-def hash_payload(data: dict) -> str:
-    serialized = json.dumps(data, sort_keys=True).encode('utf-8')
-    return hashlib.sha256(serialized).hexdigest()
+def eth_address_validator(address: str) -> bool:
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", str(address)))
 
-def batch_process_txs(tx_list: list, salt: str) -> list:
-    processed = []
-    for tx in tx_list:
-        tx['nonce'] = hash_payload({'tx': tx, 'salt': salt})[:8]
-        processed.append(tx)
-    return processed
-
-def derive_shard_id(address: str, total_shards: int) -> int:
-    hash_val = int(hashlib.md5(address.encode()).hexdigest(), 16)
-    return hash_val % total_shards
-
-def sanitize_float(val: any) -> float:
+def positive_value_validator(value: Any) -> bool:
     try:
-        return float(val)
+        return float(value) > 0
     except (ValueError, TypeError):
-        return 0.0
+        return False
 
-def sign_payload_mock(data: dict) -> dict:
-    data['_metadata'] = {'signature': generate_entropy(16)}
-    return data
+class TransactionProcessor:
+    def __init__(self):
+        self.rules: Dict[str, List[Callable[[Any], bool]]] = {
+            "from_addr": [eth_address_validator],
+            "to_addr": [eth_address_validator],
+            "value_wei": [positive_value_validator],
+        }
+
+    def validation_loop(self, tx_stream: Generator[Dict[str, Any], None, None]) -> Generator[Dict[str, Any], None, None]:
+        for tx in tx_stream:
+            try:
+                is_valid = all(
+                    all(rule(tx.get(field)) for rule in rules)
+                    for field, rules in self.rules.items()
+                )
+                
+                if not is_valid:
+                    raise InvalidTransactionError(f"Malformed transaction data structure: {tx}")
+                
+                if tx.get("from_addr") == tx.get("to_addr"):
+                    raise InvalidTransactionError("Self-transfer attempts are strictly invalid")
+                
+                tx["verified_secure"] = True
+                yield tx
+                
+            except InvalidTransactionError as err:
+                yield {"error": str(err), "corrupted_payload": tx}
