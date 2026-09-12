@@ -1,46 +1,31 @@
-import hashlib
-import time
+from typing import Optional, Any
 
+class BlockchainError(Exception):
+    """Base exception for the blockchain-helper-83 ecosystem."""
+    def __init__(self, message: str, context: Optional[Any] = None) -> None:
+        super().__init__(message)
+        self.context = context
 
-class BlockchainException(Exception):
-    """Base exception with dynamic error hash and timestamping."""
+class ConsensusTimeout(BlockchainError):
+    """Raised when the network fails to reach consensus in time."""
+    pass
 
-    def __init__(self, message: str):
-        self.timestamp = time.time()
-        # Generate a unique error fingerprint based on class name and message
-        payload = f"{self.__class__.__name__}:{message}:{self.timestamp}"
-        self.error_code = hashlib.sha256(payload.encode()).hexdigest()[:8]
-        self.message = f"[{self.error_code}] {message}"
-        super().__init__(self.message)
+class TransactionValidationError(BlockchainError):
+    """Raised when a transaction payload fails structural integrity checks."""
+    def __init__(self, message: str, tx_hash: Optional[str] = None) -> None:
+        super().__init__(message, context=tx_hash)
 
+class NodeSyncFailure(BlockchainError):
+    """Exception indicating that a peer node is out of sync."""
+    def __init__(self, peer_address: str, latency: float) -> None:
+        msg = f"Node {peer_address} is too slow (latency: {latency}s)"
+        super().__init__(msg, context={'peer': peer_address, 'latency': latency})
 
-class InsufficientGasError(BlockchainException):
-    """Raised when transaction gas limit is lower than required."""
+class WalletSecurityAlert(BlockchainError):
+    """Critical exception for unauthorized access attempts."""
+    pass
 
-    def __init__(self, required: int, provided: int):
-        msg = f"Gas deficit: needed {required} gwei, but only {provided} gwei provided."
-        super().__init__(msg)
-
-
-class DoubleSpendDetected(BlockchainException):
-    """Raised when a transaction attempts to spend UTXO already spent."""
-
-    def __init__(self, tx_hash: str, utxo_index: int):
-        msg = f"Double spend attempt at TX {tx_hash} on output {utxo_index}."
-        super().__init__(msg)
-
-
-class ReentrancyAttackDetected(BlockchainException):
-    """Raised when suspect call pattern mimics reentrancy."""
-
-    def __init__(self, contract_address: str, gas_left: int):
-        msg = f"Reentrancy pattern intercepted on {contract_address}. Remaining gas: {gas_left}."
-        super().__init__(msg)
-
-
-class BlockPropagationTimeout(BlockchainException):
-    """Raised when block broadcast fails to reach consensus in time."""
-
-    def __init__(self, block_height: int, peer_count: int):
-        msg = f"Block #{block_height} timed out with only {peer_count} peer acknowledgments."
-        super().__init__(msg)
+def raise_if_none(value: Optional[Any], name: str) -> None:
+    """Sanity check helper to prevent null propagation."""
+    if value is None:
+        raise BlockchainError(f"Expected {name}, but found null-like object")
