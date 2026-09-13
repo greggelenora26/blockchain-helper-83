@@ -1,41 +1,29 @@
 import os
-import json
-from typing import Any, Dict
+from typing import Final, Dict
+from dataclasses import dataclass
 
-class ConfigLoader:
-    def __init__(self, defaults: Dict[str, Any] = None):
-        self._data = defaults or {}
-        self._env_prefix = "BLOCKCHAIN_"
+@dataclass(frozen=True)
+class NetworkSettings:
+    TIMEOUT: Final[int] = 30
+    RETRIES: Final[int] = 3
+    SEED_NODES: Final[tuple] = ('mainnet.crypto.org', 'testnet.crypto.org')
 
-    def load(self, path: str = "config.json") -> None:
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                self._data.update(json.load(f))
-        self._apply_env_overrides()
+def get_environment_config() -> Dict[str, str]:
+    return {
+        'RPC_URL': os.getenv('BLOCKCHAIN_RPC', 'http://127.0.0.1:8545'),
+        'CHAIN_ID': os.getenv('CHAIN_ID', '1'),
+        'WALLET_MODE': os.getenv('MODE', 'read-only')
+    }
 
-    def _apply_env_overrides(self) -> None:
-        for key in self._data.keys():
-            env_val = os.getenv(f"{self._env_prefix}{key.upper()}")
-            if env_val:
-                try:
-                    self._data[key] = json.loads(env_val)
-                except json.JSONDecodeError:
-                    self._data[key] = env_val
+class ConfigRegistry:
+    def __init__(self):
+        self._data = get_environment_config()
+        self.network = NetworkSettings()
 
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._data.get(key, default)
-
-    def __getitem__(self, key: str) -> Any:
-        return self._data[key]
+    def __getitem__(self, key: str) -> str:
+        return self._data.get(key, '')
 
     def __repr__(self) -> str:
-        return f"ConfigLoader(keys={list(self._data.keys())})"
+        return f"ConfigRegistry(active_nodes={len(self.network.SEED_NODES)})"
 
-def get_config() -> ConfigLoader:
-    loader = ConfigLoader({
-        "rpc_url": "https://mainnet.infura.io/v3/",
-        "timeout": 30,
-        "retry_count": 3
-    })
-    loader.load()
-    return loader
+settings = ConfigRegistry()
