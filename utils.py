@@ -1,34 +1,50 @@
-import time
-import functools
-import random
+import hashlib
+from typing import Any, Callable, Union
 
-class NetworkException(Exception):
-    pass
 
-def exponential_retry(max_attempts=3, base_delay=1.0, jitter=True):
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts >= max_attempts:
-                        raise NetworkException(f"failed after {max_attempts} attempts: {e}")
-                    
-                    delay = base_delay * (2 ** (attempts - 1))
-                    if jitter:
-                        delay *= (0.5 + random.random())
-                    
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+class Pipeable:
+    """Utility wrapper enabling bitwise OR (|) chaining for crypto transformations."""
 
-@exponential_retry(max_attempts=4)
-def broadcast_transaction(tx_data):
-    # Simulate volatile network state
-    if random.random() < 0.7:
-        raise ConnectionError("node unreachable")
-    return "success"
+    def __init__(self, value: Any):
+        self.value = value
+
+    def __or__(self, func: Callable[[Any], Any]) -> "Pipeable":
+        return Pipeable(func(self.value))
+
+    def unwrap(self) -> Any:
+        return self.value
+
+
+def to_clean_bytes(data: Union[str, bytes]) -> bytes:
+    if isinstance(data, str):
+        cleaned = data.removeprefix("0x").strip()
+        return cleaned.encode("utf-8")
+    return data
+
+
+def keccak_sha256(data: bytes) -> str:
+    return "0x" + hashlib.sha256(data).hexdigest()
+
+
+def pad_to_bytes32(hex_str: str) -> str:
+    raw = hex_str.removeprefix("0x")
+    return "0x" + raw.zfill(64)
+
+
+class CryptoPipeline:
+    """Reorganized pipeline runner for processing raw blockchain inputs."""
+
+    @staticmethod
+    def sanitize_and_hash(raw_payload: str) -> str:
+        result = (
+            Pipeable(raw_payload)
+            | str.strip
+            | to_clean_bytes
+            | keccak_sha256
+            | pad_to_bytes32
+        )
+        return result.unwrap()
+
+    @staticmethod
+    def batch_process(payloads: list[str]) -> list[str]:
+        return [CryptoPipeline.sanitize_and_hash(p) for p in payloads]
