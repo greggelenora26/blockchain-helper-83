@@ -1,23 +1,23 @@
 # blockchain-helper-83
 
-A high-performance Python toolkit designed to streamline interactions with EVM-compatible blockchains. It simplifies complex data retrieval and transaction signing for decentralized application developers.
+A high-performance Python toolkit designed to streamline interactions with EVM-compatible chains. It simplifies complex transaction signing, gas estimation, and mempool monitoring for developers building decentralized applications.
 
 ## Features
 
-*   **RPC Connection Pooling:** Automatically manages multiple node endpoints with failover logic to ensure 99.9% uptime for data queries.
-*   **Transaction Gas Estimator:** Predicts optimal gas fees using real-time mempool analysis to prevent transaction drops and overpayment.
-*   **Smart Contract Decoder:** Instantly parses complex hex input data into human-readable JSON formats using stored ABI definitions.
-*   **Wallet Security Scanner:** Integrates basic pre-flight checks to identify potential blacklisted addresses or suspicious interaction patterns before broadcasting.
+*   **Smart Gas Estimator:** Calculates optimal gas fees in real-time by analyzing block congestion, helping to minimize transaction costs.
+*   **Secure Private Key Vault:** Implements AES-256 encryption to manage local wallet storage and facilitate signing without exposing raw keys.
+*   **Asynchronous RPC Requests:** Leverages `aiohttp` to perform parallel blockchain data fetching, significantly reducing latency for multi-chain queries.
+*   **Log Event Parser:** Automatically decodes complex event logs and contract data structures into clean JSON outputs for immediate application integration.
 
 ## Installation
 
-Ensure you have Python 3.9+ installed. Install the package via pip:
+Ensure you have Python 3.9+ installed. Install the package directly via pip:
 
 ```bash
 pip install blockchain-helper-83
 ```
 
-For local development, clone the repository and install requirements:
+For local development or to run the internal testing suite:
 
 ```bash
 git clone https://github.com/Developer/blockchain-helper-83.git
@@ -25,27 +25,27 @@ cd blockchain-helper-83
 pip install -r requirements.txt
 ```
 
-## Usage
+## Basic Usage
 
-Quickly fetch the latest block information or monitor a specific wallet address:
+The following example demonstrates how to initialize the helper and retrieve the current block gas price:
 
 ```python
 from blockchain_helper import Client
 
-# Initialize client with your RPC provider
-client = Client(rpc_url="https://mainnet.infura.io/v3/YOUR_API_KEY")
+# Initialize the client with an RPC provider
+client = Client(rpc_url="https://eth-mainnet.alchemyapi.io/v2/your-key")
 
-# Fetch latest block data
-latest_block = client.get_latest_block()
-print(f"Current Block: {latest_block.number}")
+# Retrieve and print the recommended gas price in Gwei
+gas_price = client.get_gas_price()
+print(f"Current gas price: {gas_price} Gwei")
 
-# Estimate gas for a pending transaction
-gas_estimate = client.estimate_safe_gas(to="0xTargetAddress", value=1.0)
-print(f"Recommended Gas Price: {gas_estimate} Gwei")
+# Sign a simple transaction
+signed_tx = client.sign_transaction(to="0x...", value=1000000000000000, key="your-private-key")
+print(f"Transaction prepared: {signed_tx.hash}")
 ```
 
 ## License
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 Distributed under the MIT License. See `LICENSE` for more information.
