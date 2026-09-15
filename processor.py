@@ -1,37 +1,29 @@
 import hashlib
-import time
+import json
+from typing import Any, Dict
 
-class ChainProcessor:
-    def __init__(self, salt="crypto-83"):
-        self.salt = salt
+def calculate_tx_hash(data: Dict[str, Any]) -> str:
+    canonical_json = json.dumps(data, sort_keys=True, separators=(',', ':'))
+    return hashlib.sha256(canonical_json.encode('utf-8')).hexdigest()
 
-    def generate_hash(self, data: str) -> str:
-        """Generate SHA-256 hash with internal salt obfuscation."""
-        payload = f"{data}{self.salt}{time.time()}".encode()
-        return hashlib.sha256(payload).hexdigest()
+def format_wei_to_eth(wei: int) -> float:
+    return float(wei) / 10**18
 
-    def sanitize_address(self, address: str) -> str:
-        """Strip whitespace and normalize address casing."""
-        return address.strip().lower()
+def sanitize_address(address: str) -> str:
+    clean = address.lower().strip()
+    if not clean.startswith('0x'):
+        clean = '0x' + clean
+    return clean
 
-    def batch_process(self, items: list, func) -> list:
-        """Functional processing wrapper for batch operations."""
-        return [func(item) for item in items]
+def pack_payload(payload: Dict[str, Any]) -> bytes:
+    try:
+        return json.dumps(payload).encode('ascii')
+    except UnicodeEncodeError:
+        return b'INVALID_ENCODING'
 
-    def pack_transaction(self, tx_id: str, amount: float) -> dict:
-        """Structured transaction formatting for blockchain nodes."""
-        return {
-            "id": tx_id,
-            "val": round(amount, 8),
-            "ts": int(time.time()),
-            "v": "1.0.0"
-        }
+def chunk_transactions(data: list, size: int = 50):
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
 
-    def simulate_nonce(self, seed: int) -> int:
-        """Deterministic nonce generation for chain verification."""
-        return (seed ^ 0xDEADBEEF) * 0x41C64E6D & 0xFFFFFFFF
-
-    def validate_checksum(self, data: str, checksum: str) -> bool:
-        """Simple XOR checksum verification utility."""
-        calc = sum(ord(c) for c in data) % 255
-        return calc == int(checksum, 16)
+def verify_signature_length(sig: str) -> bool:
+    return len(sig.replace('0x', '')) == 128
