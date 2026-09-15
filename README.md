@@ -1,55 +1,48 @@
 # blockchain-helper-83
 
-`blockchain-helper-83` is a lightweight Python toolkit designed to streamline interactions with EVM-compatible chains. It simplifies routine tasks like nonce management, gas estimation, and transaction broadcasting for developers building decentralized applications.
+`blockchain-helper-83` is a lightweight Python toolkit designed to streamline interactions with EVM-compatible blockchains. It simplifies common tasks such as wallet management, gas estimation, and contract event indexing for rapid crypto development.
 
-## Features
+### Features
 
-*   **Gas Oracle Integration:** Automatically fetch and calibrate optimal gas fees based on real-time network congestion to minimize failed transactions.
-*   **Encrypted Key Vault:** Securely manage local wallet keystores with native AES-256 encryption support for safer private key handling during local testing.
-*   **Transaction Batching:** Serialize and broadcast multiple smart contract interactions in a single atomic bundle to reduce RPC overhead.
-*   **Etherscan/BscScan Wrapper:** Perform automated contract verification and balance queries with minimal boilerplate code.
+*   **Automated Gas Optimization:** Dynamically fetches current network base fees and adds suggested priority tips to prevent stuck transactions.
+*   **Encrypted Key Storage:** Utilizes industry-standard AES-256 encryption to manage private keys locally, ensuring security in development environments.
+*   **Event Stream Listener:** Provides an asynchronous interface to subscribe to specific smart contract logs without complex WebSocket overhead.
+*   **Unit Conversion Utilities:** Built-in helpers for seamless handling of Wei, Gwei, and Ether denominations, preventing common precision errors.
 
-## Installation
+### Installation
 
-Ensure you have Python 3.9+ installed. Install the package via pip:
-
-```bash
-pip install blockchain-helper-83
-```
-
-For development mode:
+Requires Python 3.9+ and `pip`. It is recommended to install within a virtual environment.
 
 ```bash
+# Clone the repository
 git clone https://github.com/Developer/blockchain-helper-83.git
 cd blockchain-helper-83
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Usage
+### Basic Usage
 
-Initialize the client and send a simple transfer transaction:
+Below is a simple example for fetching the balance of an Ethereum address and calculating a gas-optimized transaction fee.
 
 ```python
-from blockchain_helper import Client
+from blockchain_helper import Web3Client, Wallet
 
-# Initialize provider
-client = Client(rpc_url="https://rpc.ankr.com/eth")
+# Initialize client
+client = Web3Client(rpc_url="https://mainnet.infura.io/v3/YOUR_PROJECT_ID")
 
-# Send transaction
-tx_hash = client.send_transaction(
-    sender="0xYourAddress",
-    private_key="0xYourPrivateKey",
-    to="0xRecipientAddress",
-    value=0.1  # ETH
-)
+# Fetch balance
+balance = client.get_balance("0x71C7656...73D4")
+print(f"Address Balance: {balance} ETH")
 
-print(f"Transaction successful: {tx_hash}")
+# Calculate recommended gas price
+gas_estimate = client.get_optimized_gas_price()
+print(f"Suggested Gas Price: {gas_estimate} Gwei")
 ```
 
-## Contributing
-Contributions are welcome. Please ensure all code passes the internal linting suite and includes unit tests before submitting a Pull Request.
+### License
 
-## License
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Distributed under the MIT License. See `LICENSE` for more information.
