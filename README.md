@@ -1,46 +1,52 @@
 # blockchain-helper-83
 
-`blockchain-helper-83` is a lightweight Python toolkit designed to streamline interactions with EVM-compatible blockchains. It simplifies common tasks such as wallet management, gas estimation, and secure transaction signing for decentralized applications.
+A high-performance Python toolkit designed to streamline interactions with EVM-compatible blockchains. This utility simplifies complex on-chain operations, making it an essential companion for developers building dApps and automated trading bots.
 
 ## Features
 
-*   **Gas Oracle Integration:** Automatically fetch real-time gas prices to optimize transaction costs based on current network congestion.
-*   **Encrypted Key Management:** Provides helper methods to handle keystore files securely, ensuring private keys are never exposed in plaintext.
-*   **Batch Transaction Processing:** Support for bundling multiple contract calls into a single transaction to reduce network overhead.
-*   **ERC-20 Utilities:** Simplified balance lookups and automated allowance checking for standard token interactions.
+*   **Async Web3 Provider:** Built on `asyncio` to handle multiple concurrent contract calls without blocking the event loop.
+*   **Gas Estimation Engine:** Real-time fee tracking and optimization logic to minimize transaction costs on Ethereum and L2 networks.
+*   **Keystore Security:** Implements secure private key management and encrypted transaction signing workflows.
+*   **Contract ABI Parser:** Automated generation of clean Python interfaces from raw contract ABIs for type-safe method calling.
 
 ## Installation
 
-Ensure you have Python 3.8+ installed. It is recommended to use a virtual environment:
+Ensure you have Python 3.9+ installed. Install the library via pip:
 
 ```bash
-# Clone the repository
+pip install blockchain-helper-83
+```
+
+For development mode and testing dependencies:
+
+```bash
 git clone https://github.com/Developer/blockchain-helper-83.git
 cd blockchain-helper-83
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-Below is a simple example of how to initialize the helper and check a wallet balance on the Ethereum Mainnet:
+Below is a brief example of how to initialize a provider and fetch a balance:
 
 ```python
-from bch_helper import BlockchainClient
+from blockchain_helper import NetworkClient
 
-# Initialize with your node provider URL
-client = BlockchainClient(provider_url="https://mainnet.infura.io/v3/YOUR_PROJECT_ID")
+# Initialize the client
+client = NetworkClient(rpc_url="https://eth.llamarpc.com")
 
-# Fetch balance for a specific address
-address = "0x71C7656...1234"
-balance = client.get_eth_balance(address)
+# Get wallet balance asynchronously
+async def get_my_balance():
+    balance = await client.get_balance("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
+    print(f"Current Balance: {balance} ETH")
 
-print(f"Balance for {address}: {balance} ETH")
+# Execute
+import asyncio
+asyncio.run(get_my_balance())
 ```
 
 ## License
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
