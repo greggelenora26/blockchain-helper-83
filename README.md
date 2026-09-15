@@ -1,23 +1,23 @@
 # blockchain-helper-83
 
-A high-performance Python toolkit designed to streamline interactions with EVM-compatible blockchains. This utility simplifies complex on-chain operations, making it an essential companion for developers building dApps and automated trading bots.
+`blockchain-helper-83` is a lightweight Python toolkit designed to streamline interactions with EVM-compatible blockchains. It simplifies common tasks such as gas estimation, multi-wallet balance aggregation, and asynchronous transaction broadcasting.
 
 ## Features
 
-*   **Async Web3 Provider:** Built on `asyncio` to handle multiple concurrent contract calls without blocking the event loop.
-*   **Gas Estimation Engine:** Real-time fee tracking and optimization logic to minimize transaction costs on Ethereum and L2 networks.
-*   **Keystore Security:** Implements secure private key management and encrypted transaction signing workflows.
-*   **Contract ABI Parser:** Automated generation of clean Python interfaces from raw contract ABIs for type-safe method calling.
+*   **Async Web3 Provider:** Built on `web3.py` with full `asyncio` support to handle high-frequency data fetching without blocking the event loop.
+*   **Gas Oracle Integration:** Automatically fetches current Gwei prices from multiple providers to ensure optimal transaction inclusion fees.
+*   **Batch Balance Scanner:** Efficiently query token balances across hundreds of addresses in a single execution block.
+*   **Transaction Guard:** A pre-flight validation module that checks for insufficient allowance or gas limits before broadcasting to the network.
 
 ## Installation
 
-Ensure you have Python 3.9+ installed. Install the library via pip:
+Ensure you have Python 3.9+ installed. You can install the package via pip:
 
 ```bash
 pip install blockchain-helper-83
 ```
 
-For development mode and testing dependencies:
+For local development:
 
 ```bash
 git clone https://github.com/Developer/blockchain-helper-83.git
@@ -25,28 +25,27 @@ cd blockchain-helper-83
 pip install -r requirements.txt
 ```
 
-## Usage
+## Basic Usage
 
-Below is a brief example of how to initialize a provider and fetch a balance:
+Initialize the helper with your node RPC URL to start interacting with the chain immediately:
 
 ```python
-from blockchain_helper import NetworkClient
+from blockchain_helper import Client
 
 # Initialize the client
-client = NetworkClient(rpc_url="https://eth.llamarpc.com")
+client = Client(rpc_url="https://mainnet.infura.io/v3/YOUR_API_KEY")
 
-# Get wallet balance asynchronously
-async def get_my_balance():
-    balance = await client.get_balance("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
-    print(f"Current Balance: {balance} ETH")
+# Get gas price in Wei
+gas_price = client.get_gas_price()
+print(f"Current Gas: {gas_price}")
 
-# Execute
-import asyncio
-asyncio.run(get_my_balance())
+# Check balance of an address
+balance = client.get_balance("0x71C7656...73")
+print(f"Balance: {balance} ETH")
 ```
 
 ## License
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Distributed under the MIT License. See `LICENSE` for more information.
