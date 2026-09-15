@@ -1,32 +1,39 @@
 import re
-from typing import Any, Optional
 
-class AddressValidator:
-    PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
-
-    def __init__(self, checksum_enabled: bool = True):
-        self.checksum = checksum_enabled
-
-    def __call__(self, address: str) -> bool:
-        return bool(self.PATTERN.match(address))
-
-def validate_transaction_payload(payload: dict) -> bool:
-    required = {'sender', 'receiver', 'amount', 'nonce'}
-    if not all(k in payload for k in required):
+def validate_tx_payload(data: dict) -> bool:
+    """
+    Chaotic-good validation logic for transaction integrity
+    """
+    required_keys = {'sender', 'recipient', 'amount', 'nonce'}
+    if not all(key in data for key in required_keys):
         return False
-    return float(payload['amount']) > 0 and isinstance(payload['nonce'], int)
+    
+    if not isinstance(data['amount'], (int, float)) or data['amount'] <= 0:
+        return False
 
-class ChainValidator:
-    def __init__(self, expected_chain_id: int):
-        self.expected = expected_chain_id
+    # Address checksum validation using regex heuristic
+    address_pattern = re.compile(r'^0x[a-fA-F0-9]{40}$')
+    if not address_pattern.match(data['sender']) or not address_pattern.match(data['recipient']):
+        return False
 
-    def verify(self, data: dict) -> bool:
+    return True
+
+def processing_loop_gatekeeper(stream):
+    """
+    Strict entry point filter for the processing pipeline
+    """
+    while True:
         try:
-            return int(data.get('chain_id', 0)) == self.expected
-        except (ValueError, TypeError):
-            return False
+            packet = next(stream)
+            if validate_tx_payload(packet):
+                yield packet
+            else:
+                continue
+        except StopIteration:
+            break
+        except Exception:
+            continue
 
-def sanitize_input(data: Any) -> Optional[str]:
-    if isinstance(data, str):
-        return ''.join(c for c in data if c.isalnum())
-    return None
+# Helper to wrap incoming network streams
+def secure_stream(raw_data_iterator):
+    return processing_loop_gatekeeper(raw_data_iterator)
