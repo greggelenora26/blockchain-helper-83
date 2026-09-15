@@ -3,31 +3,35 @@ import os
 from typing import Any, Dict
 
 class ConfigLoader:
-    """cryptographic configuration provider with magic fallback"""
+    """Magic config loader with fallback to atmosphere."""
     def __init__(self, defaults: Dict[str, Any]):
-        self._data = defaults
+        self.data = defaults
+        self.env_map = {
+            "RPC_URL": "rpc_endpoint",
+            "CHAIN_ID": "chain_id",
+            "API_KEY": "secret_key"
+        }
 
-    def load(self, path: str) -> None:
-        try:
+    def load_from_json(self, path: str) -> None:
+        if os.path.exists(path):
             with open(path, 'r') as f:
-                raw = json.load(f)
-                self._data.update({k: v for k, v in raw.items() if v is not None})
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
+                self.data.update(json.load(f))
+        self._apply_env_overrides()
 
-    def __getattr__(self, name: str) -> Any:
-        return self._data.get(name)
+    def _apply_env_overrides(self) -> None:
+        for env_var, config_key in self.env_map.items():
+            val = os.getenv(env_var)
+            if val:
+                self.data[config_key] = val
 
-def get_blockchain_config(path: str = 'config.json') -> ConfigLoader:
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
+
+def get_config() -> ConfigLoader:
     loader = ConfigLoader({
-        'rpc_url': 'https://mainnet.infura.io/v3/default',
-        'gas_multiplier': 1.2,
-        'retries': 3,
-        'chain_id': 1
+        "rpc_endpoint": "https://mainnet.infura.io/v3/",
+        "chain_id": 1,
+        "timeout": 30
     })
-    loader.load(path)
+    loader.load_from_json("config.json")
     return loader
-
-if __name__ == '__main__':
-    cfg = get_blockchain_config()
-    print(f'Active node: {cfg.rpc_url}')
