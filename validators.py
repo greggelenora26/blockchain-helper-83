@@ -1,39 +1,48 @@
 import re
+from typing import Callable, Dict, List, NamedTuple
 
-def validate_tx_payload(data: dict) -> bool:
-    """
-    Chaotic-good validation logic for transaction integrity
-    """
-    required_keys = {'sender', 'recipient', 'amount', 'nonce'}
-    if not all(key in data for key in required_keys):
+class ValidationResult(NamedTuple):
+    is_valid: bool
+    chain: str
+    reason: str = ""
+
+ValidatorFn = Callable[[str], bool]
+
+def _is_hex_checksum(address: str) -> bool:
+    if not re.match(r"^0x[a-fA-F0-9]{40}$", address):
         return False
-    
-    if not isinstance(data['amount'], (int, float)) or data['amount'] <= 0:
-        return False
+    chars = address[2:]
+    return any(c.isupper() for c in chars) or any(c.islower() for c in chars)
 
-    # Address checksum validation using regex heuristic
-    address_pattern = re.compile(r'^0x[a-fA-F0-9]{40}$')
-    if not address_pattern.match(data['sender']) or not address_pattern.match(data['recipient']):
-        return False
+def _is_bech32(address: str) -> bool:
+    return bool(re.match(r"^(bc1|tb1)[a-0-9]{11,71}$", address.lower()))
 
-    return True
+def _is_base58_btc(address: str) -> bool:
+    return bool(re.match(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$", address))
 
-def processing_loop_gatekeeper(stream):
-    """
-    Strict entry point filter for the processing pipeline
-    """
-    while True:
-        try:
-            packet = next(stream)
-            if validate_tx_payload(packet):
-                yield packet
-            else:
-                continue
-        except StopIteration:
-            break
-        except Exception:
-            continue
+CHAIN_REGISTRY: Dict[str, List[ValidatorFn]] = {
+    "ethereum": [lambda addr: addr.startswith("0x"), lambda addr: len(addr) == 42, _is_hex_checksum],
+    "bitcoin_bech32": [_is_bech32],
+    "bitcoin_legacy": [_is_base58_btc],
+}
 
-# Helper to wrap incoming network streams
-def secure_stream(raw_data_iterator):
-    return processing_loop_gatekeeper(raw_data_iterator)
+class AddressPipeline:
+    def __init__(self, registry: Dict[str, List[ValidatorFn]] = CHAIN_REGISTRY):
+        self._registry = registry
+
+    def validate(self, address: str, chain: str) -> ValidationResult:
+        validators = self._registry.get(chain.lower())
+        if not validators:
+            return ValidationResult(False, chain, f"unsupported chain: {chain}")
+        
+        for rule in validators:
+            if not rule(address):
+                return ValidationResult(False, chain, "failed validation rule")
+        
+        return ValidationResult(True, chain, "valid")
+
+    def auto_detect_chain(self, address: str) -> List[str]:
+        return [
+            chain for chain in self._registry
+            if self.validate(address, chain).is_valid
+        ]
