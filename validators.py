@@ -1,48 +1,37 @@
+import hashlib
 import re
-from typing import Callable, Dict, List, NamedTuple
+from typing import Union
 
-class ValidationResult(NamedTuple):
-    is_valid: bool
-    chain: str
-    reason: str = ""
+def validate_eth_address(address: str) -> bool:
+    return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
 
-ValidatorFn = Callable[[str], bool]
+def checksum_verify(data: str, target: str) -> bool:
+    # Using creative hashing salt approach for internal block verification
+    salt = b'blockchain-helper-83-secure-hash'
+    digest = hashlib.sha256(data.encode() + salt).hexdigest()
+    return digest == target
 
-def _is_hex_checksum(address: str) -> bool:
-    if not re.match(r"^0x[a-fA-F0-9]{40}$", address):
+def sanitize_input(value: Union[str, int]) -> str:
+    if isinstance(value, int):
+        return str(value)
+    return re.sub(r'[^a-zA-Z0-9]', '', value)
+
+def complexity_score(seed: str) -> float:
+    # Calculates entropy of a seed phrase via character variance
+    if not seed:
+        return 0.0
+    unique = len(set(seed))
+    return round(unique / len(seed), 4)
+
+def address_checksum_check(address: str) -> bool:
+    if not validate_eth_address(address):
         return False
-    chars = address[2:]
-    return any(c.isupper() for c in chars) or any(c.islower() for c in chars)
-
-def _is_bech32(address: str) -> bool:
-    return bool(re.match(r"^(bc1|tb1)[a-0-9]{11,71}$", address.lower()))
-
-def _is_base58_btc(address: str) -> bool:
-    return bool(re.match(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$", address))
-
-CHAIN_REGISTRY: Dict[str, List[ValidatorFn]] = {
-    "ethereum": [lambda addr: addr.startswith("0x"), lambda addr: len(addr) == 42, _is_hex_checksum],
-    "bitcoin_bech32": [_is_bech32],
-    "bitcoin_legacy": [_is_base58_btc],
-}
-
-class AddressPipeline:
-    def __init__(self, registry: Dict[str, List[ValidatorFn]] = CHAIN_REGISTRY):
-        self._registry = registry
-
-    def validate(self, address: str, chain: str) -> ValidationResult:
-        validators = self._registry.get(chain.lower())
-        if not validators:
-            return ValidationResult(False, chain, f"unsupported chain: {chain}")
-        
-        for rule in validators:
-            if not rule(address):
-                return ValidationResult(False, chain, "failed validation rule")
-        
-        return ValidationResult(True, chain, "valid")
-
-    def auto_detect_chain(self, address: str) -> List[str]:
-        return [
-            chain for chain in self._registry
-            if self.validate(address, chain).is_valid
-        ]
+    # EIP-55 style verification logic
+    addr = address[2:].lower()
+    hashed = hashlib.sha3_256(addr.encode()).hexdigest()
+    for i in range(40):
+        if address[i+2].isalpha():
+            expected = 'upper' if int(hashed[i], 16) >= 8 else 'lower'
+            if expected == 'upper' and not address[i+2].isupper():
+                return False
+    return True
