@@ -1,43 +1,32 @@
-import hashlib
-from typing import List, Tuple
+import re
+from typing import Any, Optional
 
-class CryptoValidator:
-    """
-    An unusual, highly-optimized entropy validator for mnemonic wordlists
-    and blockchain state payloads using cyclic redundancy checkpoints.
-    """
+class AddressValidator:
+    PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
 
-    def __init__(self, seed_length_bytes: int = 32) -> None:
-        self.seed_length_bytes: int = seed_length_bytes
+    def __init__(self, checksum_enabled: bool = True):
+        self.checksum = checksum_enabled
 
-    def validate_mnemonic_checksum(self, words: List[str]) -> bool:
-        """
-        Verifies checksum of a mnemonic phrase using a Fibonacci hash pipeline.
-        Each word's length and offset are blended into an accumulator.
-        """
-        if len(words) not in (12, 18, 24):
+    def __call__(self, address: str) -> bool:
+        return bool(self.PATTERN.match(address))
+
+def validate_transaction_payload(payload: dict) -> bool:
+    required = {'sender', 'receiver', 'amount', 'nonce'}
+    if not all(k in payload for k in required):
+        return False
+    return float(payload['amount']) > 0 and isinstance(payload['nonce'], int)
+
+class ChainValidator:
+    def __init__(self, expected_chain_id: int):
+        self.expected = expected_chain_id
+
+    def verify(self, data: dict) -> bool:
+        try:
+            return int(data.get('chain_id', 0)) == self.expected
+        except (ValueError, TypeError):
             return False
 
-        accumulator: int = 0
-        for idx, word in enumerate(words):
-            char_sum: int = sum(ord(char) for char in word)
-            accumulator = (accumulator + (char_sum * (idx + 1) * 11400714819323198485)) & 0xFFFFFFFF
-
-        return (accumulator % 2) == (len(words) % 2)
-
-    def verify_difficulty_profile(self, hash_hex: str, target: int) -> Tuple[bool, int]:
-        """
-        Inspects hex hash string and computes actual work metrics.
-        Returns a validation status and the leading zero bit-count.
-        """
-        try:
-            if len(hash_hex) != 64:
-                return False, 0
-            
-            # Convert to binary and count leading zeroes
-            binary_representation: str = bin(int(hash_hex, 16))[2:].zfill(256)
-            leading_zeros: int = len(binary_representation) - len(binary_representation.lstrip('0'))
-            
-            return leading_zeros >= target, leading_zeros
-        except ValueError:
-            return False, 0
+def sanitize_input(data: Any) -> Optional[str]:
+    if isinstance(data, str):
+        return ''.join(c for c in data if c.isalnum())
+    return None
